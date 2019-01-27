@@ -9,13 +9,6 @@
 #define r_IN(n, i) ((GetRealInPortPtrs(blk, n+1))[(i)]) 
 #define r_OUT(n, i) ((GetRealOutPortPtrs(blk, n+1))[(i)])
 
-struct pi_reg_state{
-	int32_t ki;
-	int32_t kp;
-	int32_t a;
-	int32_t y;	
-};
-
 extern const int32_t cos_tb[1024];
 
 static inline int32_t mycos(int32_t a)
@@ -26,19 +19,6 @@ static inline int32_t mycos(int32_t a)
 static inline int32_t mysin(int32_t a)
 {
 	return cos_tb[1023&(a+3*MY_PI/2)];
-}
-
-static inline void update(scicos_block *blk, struct pi_reg_state *s, int32_t e, int32_t fs)
-{
-	int32_t a = s->a;
-	int32_t d = s->ki*e;
-	
-	// will accumulator grow up?
-	if(fs) if( ((a>0)&&(d>0))||((a<0)&&(d<0)) ) d = 0;
-
-	a += d;
-	s->y = e*s->kp + a;
-	s->a = a;
 }
 
 // calc magnitude and angle of vector using CORDIC algorithm
@@ -178,7 +158,90 @@ void exciter(scicos_block *blk, int flag)
 		
     }
 }
+/*
+struct pi_reg_state{
+	double ki;
+	double kp;
+	double a;
+	double y;	
+};
+static inline void update(scicos_block *blk, struct pi_reg_state *s, double e, int32_t fs)
+{
+	double a = s->a;
+	double d = s->ki*e;
+	
+	// will accumulator grow up?
+	if(fs) if( ((a>0)&&(d>0))||((a<0)&&(d<0)) ) d = 0;
 
+	a += d;
+	s->y = e*s->kp + a;
+	s->a = a;
+}
+void angle_tracker(scicos_block *blk, int flag)
+{
+	static struct pi_reg_state areg = {0.0, 0.0, 0.0, 0.0};
+	static double speed = 0.0;
+	static double phase = 0.0;
+	double err = 0.0;
+	const double fs = 3e3;
+	
+    switch(flag)
+    {
+		case Initialization:
+		// Initialization
+		phase = 0.0;
+		speed = 0.0;
+		
+		areg.ki = 100/fs; //(int32_t)(r_IN(0, 0)*1024);
+		areg.kp = 20;  //(int32_t)(r_IN(0, 1)*1024);
+		areg.a = 0;
+		areg.y = 0;
+
+		break;
+
+		case Ending:
+		// Simulation ending
+		break;		
+		
+		case StateUpdate:
+		//  Update block internal state
+		
+		err = r_IN(0, 0) - r_IN(1, 0);
+		update(blk, &areg, err , 0);
+		speed = areg.y;
+		
+		phase += speed/fs;
+
+		break;
+		
+		case OutputUpdate:
+		//  Put the value on the output port
+		r_OUT(0, 0) = phase;
+		r_OUT(1, 0) = speed;
+		break;
+		
+    }
+}
+*/
+
+struct pi_reg_state{
+	int32_t ki;
+	int32_t kp;
+	int32_t a;
+	int32_t y;	
+};
+static inline void update(scicos_block *blk, struct pi_reg_state *s, int32_t e, int32_t fs)
+{
+	int32_t a = s->a;
+	int32_t d = s->ki*e;
+	
+	// will accumulator grow up?
+	if(fs) if( ((a>0)&&(d>0))||((a<0)&&(d<0)) ) d = 0;
+
+	a += d;
+	s->y = e*s->kp + a;
+	s->a = a;
+}
 void angle_tracker(scicos_block *blk, int flag)
 {
 	static struct pi_reg_state areg = {0, 0, 0, 0};
@@ -193,8 +256,8 @@ void angle_tracker(scicos_block *blk, int flag)
 		phase = 0;
 		speed = 0;
 		
-		areg.ki = 100; //(int32_t)(r_IN(0, 0)*1024);
-		areg.kp = 20;  //(int32_t)(r_IN(0, 1)*1024);
+		areg.ki = (100*256)/3000; //(int32_t)(r_IN(0, 0)*1024);
+		areg.kp = 20*256;  //(int32_t)(r_IN(0, 1)*1024);
 		areg.a = 0;
 		areg.y = 0;
 
@@ -217,8 +280,8 @@ void angle_tracker(scicos_block *blk, int flag)
 		
 		case OutputUpdate:
 		//  Put the value on the output port
-		r_OUT(0, 0) = ((double)phase)/1024.0/3000/3000;
-		r_OUT(1, 0) = ((double)speed)/1024.0/3000;
+		r_OUT(0, 0) = ((double)phase)/1024.0/256/3000.0;
+		r_OUT(1, 0) = ((double)speed)/1024.0/256;
 		break;
 		
     }
