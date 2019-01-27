@@ -24,10 +24,17 @@ if bOK then
   ulink(ilib);
 end
 
+// ulink previous function with same name
+[bOK, ilib] = c_link('angle_tracker');
+if bOK then
+  ulink(ilib);
+end
+
 //
 link('resolver.so', 'exciter', 'c');
 link('resolver.so', 'envelope_extractor', 'c');
 link('resolver.so', 'angle_estimator', 'c');
+link('resolver.so', 'angle_tracker', 'c');
 
 // remove temp. variables on stack
 clear cur_path;
