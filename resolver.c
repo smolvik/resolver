@@ -9,6 +9,9 @@
 #define r_IN(n, i) ((GetRealInPortPtrs(blk, n+1))[(i)]) 
 #define r_OUT(n, i) ((GetRealOutPortPtrs(blk, n+1))[(i)])
 
+#define i32_IN(n, i) ((Getint32InPortPtrs(blk, n+1))[(i)]) 
+#define i32_OUT(n, i) ((Getint32OutPortPtrs(blk, n+1))[(i)])
+
 extern const int32_t cos_tb[1024];
 
 static inline int32_t mycos(int32_t a)
@@ -184,6 +187,7 @@ void angle_tracker(scicos_block *blk, int flag)
 	static double phase = 0.0;
 	double err = 0.0;
 	const double fs = 3e3;
+	static double dbg = 0.0;
 	
     switch(flag)
     {
@@ -205,24 +209,30 @@ void angle_tracker(scicos_block *blk, int flag)
 		
 		case StateUpdate:
 		//  Update block internal state
-		
-		err = r_IN(0, 0) - r_IN(1, 0);
-		update(blk, &areg, err , 0);
-		speed = areg.y;
-		
-		phase += speed/fs;
+		{
+			double sk = r_IN(0, 0);
+			double ck = r_IN(1, 0);
+			err = sk*cos(phase) - ck*sin(phase);
+
+			update(blk, &areg, err , 0);
+			speed = areg.y;
+			
+			phase += speed/fs;
+		}
 
 		break;
-		
+
 		case OutputUpdate:
 		//  Put the value on the output port
 		r_OUT(0, 0) = phase;
 		r_OUT(1, 0) = speed;
 		break;
-		
+
     }
 }
 */
+
+
 
 struct pi_reg_state{
 	int32_t ki;
@@ -248,16 +258,18 @@ void angle_tracker(scicos_block *blk, int flag)
 	static int32_t speed = 0;
 	static int32_t phase = 0;
 	int32_t err = 0;
+	const int32_t fs = 3000;
+	static int32_t nf = 0;
 	
     switch(flag)
     {
 		case Initialization:
 		// Initialization
-		phase = 0;
-		speed = 0;
-		
-		areg.ki = (100*256)/3000; //(int32_t)(r_IN(0, 0)*1024);
-		areg.kp = 20*256;  //(int32_t)(r_IN(0, 1)*1024);
+		phase = 0.0;
+		speed = 0.0;
+
+		areg.ki = 256*600/fs; //(int32_t)(r_IN(0, 0)*1024);
+		areg.kp = 256*100;  //(int32_t)(r_IN(0, 1)*1024);
 		areg.a = 0;
 		areg.y = 0;
 
@@ -269,20 +281,25 @@ void angle_tracker(scicos_block *blk, int flag)
 		
 		case StateUpdate:
 		//  Update block internal state
-		
-		err = (int32_t)(1024*r_IN(0, 0)) - (int32_t)(1024*r_IN(1, 0));
-		update(blk, &areg, err , 0);
-		speed = areg.y;
-		
-		phase += speed;
+		{
+			int32_t sk = (int32_t)(r_IN(0, 0)*1024);
+			int32_t ck = (int32_t)(r_IN(1, 0)*1024);
+			nf = (326*phase)/1024/fs;
+			err = (sk*mycos(nf) - ck*mysin(nf))/1024;
+
+			update(blk, &areg, err , 0);
+			speed = areg.y;
+			
+			phase += (speed)/256;
+		}
 
 		break;
-		
+
 		case OutputUpdate:
 		//  Put the value on the output port
-		r_OUT(0, 0) = ((double)phase)/1024.0/256/3000.0;
-		r_OUT(1, 0) = ((double)speed)/1024.0/256;
+		r_OUT(0, 0) = (2*3.1415/1024)*((double)nf);
+		r_OUT(1, 0) = speed;
 		break;
-		
+
     }
 }
