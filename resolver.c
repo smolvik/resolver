@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define PI 3.14159265359
+
 #define MY_PI 512
 
 #define r_IN(n, i) ((GetRealInPortPtrs(blk, n+1))[(i)]) 
@@ -161,6 +163,8 @@ void exciter(scicos_block *blk, int flag)
 		
     }
 }
+
+
 /*
 struct pi_reg_state{
 	double ki;
@@ -196,8 +200,8 @@ void angle_tracker(scicos_block *blk, int flag)
 		phase = 0.0;
 		speed = 0.0;
 		
-		areg.ki = 100/fs; //(int32_t)(r_IN(0, 0)*1024);
-		areg.kp = 20;  //(int32_t)(r_IN(0, 1)*1024);
+		areg.ki = 600/fs;
+		areg.kp = 100;
 		areg.a = 0;
 		areg.y = 0;
 
@@ -210,14 +214,17 @@ void angle_tracker(scicos_block *blk, int flag)
 		case StateUpdate:
 		//  Update block internal state
 		{
-			double sk = r_IN(0, 0);
-			double ck = r_IN(1, 0);
+			double sk = r_IN(0, 1);
+			double ck = r_IN(0, 0);
 			err = sk*cos(phase) - ck*sin(phase);
 
 			update(blk, &areg, err , 0);
 			speed = areg.y;
 			
 			phase += speed/fs;
+			if(phase > 2*PI) phase = 0.0;
+			if(phase < -2*PI) phase = 0.0;
+			
 		}
 
 		break;
@@ -231,7 +238,6 @@ void angle_tracker(scicos_block *blk, int flag)
     }
 }
 */
-
 
 
 struct pi_reg_state{
@@ -268,8 +274,8 @@ void angle_tracker(scicos_block *blk, int flag)
 		phase = 0.0;
 		speed = 0.0;
 
-		areg.ki = 256*600/fs; //(int32_t)(r_IN(0, 0)*1024);
-		areg.kp = 256*100;  //(int32_t)(r_IN(0, 1)*1024);
+		areg.ki = (1024*10000)/fs/fs;
+		areg.kp = (1024*100)/fs;
 		areg.a = 0;
 		areg.y = 0;
 
@@ -278,19 +284,23 @@ void angle_tracker(scicos_block *blk, int flag)
 		case Ending:
 		// Simulation ending
 		break;		
-		
+
 		case StateUpdate:
 		//  Update block internal state
 		{
-			int32_t sk = (int32_t)(r_IN(0, 0)*1024);
-			int32_t ck = (int32_t)(r_IN(1, 0)*1024);
-			nf = (326*phase)/1024/fs;
+			
+			int32_t sk = (int32_t)(r_IN(0, 1)*1024);
+			int32_t ck = (int32_t)(r_IN(0, 0)*1024);			
+			
 			err = (sk*mycos(nf) - ck*mysin(nf))/1024;
 
 			update(blk, &areg, err , 0);
 			speed = areg.y;
 			
-			phase += (speed)/256;
+			phase += (163*speed)/1024;
+			phase = phase & (1024*1024-1);					
+			nf = (phase/1024)&1023;			
+			
 		}
 
 		break;
@@ -298,7 +308,9 @@ void angle_tracker(scicos_block *blk, int flag)
 		case OutputUpdate:
 		//  Put the value on the output port
 		r_OUT(0, 0) = (2*3.1415/1024)*((double)nf);
-		r_OUT(1, 0) = speed;
+		//r_OUT(0, 0) = (double)phase;
+		//r_OUT(1, 0) = 180.0*((double)speed)/fs/PI;
+		r_OUT(1, 0) = (double)(speed*fs)/1024/1024;
 		break;
 
     }
