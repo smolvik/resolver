@@ -147,7 +147,7 @@ void exciter(scicos_block *blk, int flag)
 		case Ending:
 		// Simulation ending
 		break;		
-		
+
 		case StateUpdate:
 		//  Update block internal state
 		{
@@ -274,8 +274,10 @@ void angle_tracker(scicos_block *blk, int flag)
 		phase = 0.0;
 		speed = 0.0;
 
-		areg.ki = (1024*10000)/fs/fs;
-		areg.kp = (1024*100)/fs;
+		//areg.ki = (1024*10000)/fs/fs;
+		//areg.kp = (1024*1000)/fs;		
+		areg.ki = 10;
+		areg.kp = 150;
 		areg.a = 0;
 		areg.y = 0;
 
